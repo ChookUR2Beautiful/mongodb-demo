@@ -1,10 +1,12 @@
 package com.example.mongodbdemo;
 
+import com.alibaba.fastjson.JSONObject;
 import org.bson.Document;
 import org.junit.Assert;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.data.mongo.DataMongoTest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.BasicQuery;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -223,6 +225,157 @@ public class FindTests extends MongodbDemoApplicationTests {
         List<Map> stock = mongoTemplate.find(query, Map.class, "stock.ticker");
         System.out.println(stock);
     }
+
+    /**
+     * .$ 返回匹配的任意其中一个
+     */
+    @Test
+    public void findListOneTest() {
+        Query query = new Query(Criteria.where("comments.comment").is("good post"));
+        query.fields().include("comments.$");
+        List<Map> stock = mongoTemplate.find(query, Map.class, "blog.post");
+        System.out.println(stock);
+    }
+
+
+    /**
+     * $elemMatch 限制数组范围
+     */
+    @Test
+    public void elemMatchTest(){
+
+        //普通范围查询数组,只要数组的元素分别匹配条件,都会返回
+        Query query = new Query(Criteria.where("x").gt(10).lt(20));
+        List<JSONObject> elemMatch = mongoTemplate.find(query, JSONObject.class, "elemMatch");
+        Integer warnNum = 0;
+        for (JSONObject j:elemMatch
+             ) {
+            Object x = j.get("x");
+            if(x instanceof Integer){
+                int i = (Integer)x;
+                Assert.assertTrue(i>10&&i<20);
+            }else if(x instanceof List){
+                List l = (List)x;
+                for (Object lx:l
+                        ) {
+                    int i = (Integer)lx;
+                    //查询数组返回 [5,25] ,与结果不匹配
+                    if(i<10||i>20){
+                        warnNum++;
+                    }
+                }
+
+            }
+        }
+
+        //不会所有值都匹配
+        Assert.assertTrue(warnNum>0);
+
+
+    }
+
+
+    /**
+     * $elemMatch 限制数组范围
+     * 只返回数组
+     */
+    @Test
+    public void eleMathc1Test(){
+        Query query = new Query(Criteria.where("x").elemMatch(new Criteria().gt(10).lt(20)));
+        List<JSONObject> eleMathc = mongoTemplate.find(query, JSONObject.class, "eleMathc");
+        eleMathc.forEach(j ->{
+            List l = (List) j.get("x");
+            for (Object lx:l
+                    ) {
+                int i = (Integer)lx;
+                Assert.assertTrue(i>10&&i<20);{
+                }
+            }
+        });
+
+    }
+
+
+    /**
+     * $eleMatch 模糊条件查询内嵌文档
+     */
+    @Test
+    public void eleMatch2(){
+        Query query = new Query(Criteria.where("comments").
+                elemMatch(new Criteria().where("author").is("Jim").and("votes").is(1.0)));
+        List<JSONObject> jsonObjects = mongoTemplate.find(query, JSONObject.class, "blog.post");
+        System.out.println(jsonObjects);
+    }
+
+    /**
+     * limit 只返回指定数量结果
+     */
+    @Test
+    public void limitTest(){
+        List<JSONObject> user = mongoTemplate.find(new Query().limit(1), JSONObject.class, "user");
+        Assert.assertTrue(user.size()==1);
+    }
+
+
+    /**
+     * skip 跳过前x个文档,返回后面的文档
+     */
+    @Test
+    public void skipTest(){
+        List<JSONObject> user = mongoTemplate.find(new Query().skip(100000), JSONObject.class, "user");
+        Assert.assertTrue(user.size()==0);
+    }
+
+
+    /**
+     * sort 字段排序
+     */
+    @Test
+    public void sortTest(){
+        Query query = new Query().with(new Sort(Sort.Direction.DESC, "age", "username"));
+        List<JSONObject> user = mongoTemplate.find(query, JSONObject.class, "user");
+        System.out.println(user);
+    }
+
+
+    /**
+     * $maxscan 本次查询扫描文档数量上限
+     */
+    @Test
+    public void maxscanTest(){
+        Query query = new Query().maxScan(1);
+        List<JSONObject> user = mongoTemplate.find(query, JSONObject.class, "user");
+        Assert.assertTrue(user.size()==1);
+    }
+
+
+    /**
+     * $min 从索引比较,字段必须有索引
+     * $max
+     */
+    @Test
+    public void minMaxTest(){
+
+    }
+
+
+    /**
+     * 查询快照,在快照上查询
+     * 查询在_id索引上遍历执行
+     * 保证每个文档只返回一次
+     */
+    @Test
+    public void snapshotTest(){
+        Query query = new Query().useSnapshot();
+
+
+    }
+
+
+
+
+
+
 
 
 }
